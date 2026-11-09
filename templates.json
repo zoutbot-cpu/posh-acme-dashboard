@@ -1,0 +1,28 @@
+{
+  "templates": [
+    {
+      "id": "godaddy",
+      "name": "GoDaddy DNS",
+      "default": true,
+      "description": "DNS-01 validation through the GoDaddy DNS API. Supports wildcard certificates.",
+      "plugin": "GoDaddy",
+      "parameterSet": "Secure",
+      "pluginArgs": {
+        "GDCustomerId": ""
+      },
+      "serverUrl": null,
+      "certKeyLength": "2048",
+      "dnsSleep": 180,
+      "validationTimeout": 60,
+      "notes": [
+        "Use a Production API key and secret, not an OTE (test) key.",
+        "GoDaddy limits DNS API access to some account types. If validation fails with ACCESS_DENIED or 403, the GoDaddy account isn't allowed to use the API.",
+        "GoDaddy DNS changes can take a few minutes to show up. If validation fails because the TXT record isn't found, raise the DNS sleep."
+      ],
+      "links": [
+        { "label": "Create a GoDaddy API key", "url": "https://developer.godaddy.com/keys" },
+        { "label": "Posh-ACME GoDaddy guide", "url": "https://poshac.me/docs/v4/Plugins/GoDaddy/" }
+      ]
+    }
+  ]
+}

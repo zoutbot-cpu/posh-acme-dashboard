@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Posh-ACME Dashboard</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="favicon.svg" alt="" width="26" height="26">
+      <span>Posh-ACME <strong>Dashboard</strong></span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="certs" aria-selected="true">Certificates</button>
+      <button role="tab" data-tab="deploy">Deployments</button>
+      <button role="tab" data-tab="accounts">Servers &amp; accounts</button>
+      <button role="tab" data-tab="activity">Activity <span id="running-badge" class="pill hidden"></span></button>
+      <button role="tab" data-tab="renewal">Auto-renewal</button>
+      <button role="tab" data-tab="settings" class="write-only">Settings</button>
+    </nav>
+    <div class="topbar-right">
+      <span id="updated" class="muted small"></span>
+      <button id="refresh" class="btn ghost icon" title="Refresh (R)" aria-label="Refresh">&#x21bb;</button>
+      <button id="theme" class="btn ghost icon" title="Toggle theme" aria-label="Toggle theme">&#x25D0;</button>
+      <span id="whoami" class="muted small"></span>
+    </div>
+  </header>
+
+  <div id="banners"></div>
+
+  <main>
+    <!-- Certificates -->
+    <section id="tab-certs" class="tab-panel">
+      <div class="kpis" id="kpis"></div>
+
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search domains, names, plugins…  ( / )" autocomplete="off">
+        <select id="server-filter" aria-label="Filter by server"></select>
+        <div class="spacer"></div>
+        <button id="new-cert" class="btn primary write-only">+ New certificate</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="grid" id="cert-table">
+          <thead>
+            <tr>
+              <th data-sort="health">Status</th>
+              <th data-sort="mainDomain">Certificate</th>
+              <th data-sort="expires">Expires</th>
+              <th data-sort="renewAfter">Renews after</th>
+              <th data-sort="plugin">Validation</th>
+              <th data-sort="usedOn" class="col-optional">Used on</th>
+              <th data-sort="account" class="col-optional">Account</th>
+              <th class="actions-col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div id="cert-empty" class="empty hidden"></div>
+      </div>
+    </section>
+
+    <!-- Deployments -->
+    <section id="tab-deploy" class="tab-panel hidden">
+      <div class="toolbar">
+        <input id="deploy-search" type="search" placeholder="Search servers, certificates, owners…" autocomplete="off">
+        <select id="deploy-filter" aria-label="Filter by status">
+          <option value="">All statuses</option>
+          <option value="outdated">Old certificate</option>
+          <option value="mismatch">Wrong certificate</option>
+          <option value="unreachable">Unreachable</option>
+          <option value="current">Up to date</option>
+          <option value="never">Not checked yet</option>
+          <option value="unchecked">Manual</option>
+        </select>
+        <div class="spacer"></div>
+        <span id="deploy-last" class="muted small"></span>
+        <button id="deploy-check-all" class="btn no-readonly-mode">Check all now</button>
+        <button id="new-deploy" class="btn primary write-only">+ Add server</button>
+      </div>
+      <div id="deploy-summary" class="chips deploy-summary"></div>
+      <div id="deploy-body"></div>
+    </section>
+
+    <!-- Servers & accounts -->
+    <section id="tab-accounts" class="tab-panel hidden">
+      <div class="toolbar">
+        <p class="muted">Each ACME server keeps its own accounts and orders. The <span class="pill accent">current</span> server and account are what <code>Submit-Renewal</code> uses when run without parameters.</p>
+        <div class="spacer"></div>
+        <button id="new-account" class="btn write-only">+ New account</button>
+      </div>
+      <div id="servers"></div>
+    </section>
+
+    <!-- Activity -->
+    <section id="tab-activity" class="tab-panel hidden">
+      <div class="activity">
+        <div class="job-list" id="job-list"></div>
+        <div class="job-log">
+          <div class="job-log-head" id="job-log-head"><span class="muted">Select an action to view its log.</span></div>
+          <pre id="job-log"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Auto-renewal -->
+    <section id="tab-renewal" class="tab-panel hidden">
+      <div id="renewal"></div>
+    </section>
+
+    <!-- Settings -->
+    <section id="tab-settings" class="tab-panel hidden">
+      <form id="settings-form" novalidate></form>
+    </section>
+  </main>
+
+  <!-- Detail drawer -->
+  <aside id="drawer" class="drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <div>
+        <div id="drawer-status"></div>
+        <h2 id="drawer-title"></h2>
+        <div id="drawer-sub" class="muted small"></div>
+      </div>
+      <button class="btn ghost icon" data-close-drawer aria-label="Close">&#x2715;</button>
+    </div>
+    <div id="drawer-actions" class="drawer-actions write-only"></div>
+    <div id="drawer-body" class="drawer-body"></div>
+  </aside>
+  <div id="scrim" class="scrim hidden" data-close-drawer></div>
+
+  <!-- Dialog host -->
+  <dialog id="dialog"></dialog>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+</body>
+</html>

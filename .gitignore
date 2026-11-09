@@ -1,0 +1,14 @@
+# Runtime data created next to the script when -DataPath isn't used
+settings.json
+notify-state.json
+deployments.json
+install.json
+logs/
+*.log
+
+# Certificates and keys must never be committed
+*.pfx
+*.key
+*.pem
+*.cer
+*.crt

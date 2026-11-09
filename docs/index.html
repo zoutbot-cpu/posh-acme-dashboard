@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Posh-ACME Dashboard</title>
+  <meta name="description" content="A self-hosted web dashboard for Posh-ACME: see every certificate's status, renew from the browser, and find servers still using an old certificate.">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --bg: #f5f7fa; --surface: #fff; --surface-2: #eef1f6; --border: #dde3ea;
+      --text: #17202b; --muted: #5d6b7c; --accent: #2563eb; --code-bg: #101722; --code-text: #dbe4ee;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0f141b; --surface: #171e27; --surface-2: #1e2732; --border: #2c3744; --text: #e6ebf1; --muted: #93a1b2; --accent: #6ea0ff; --code-bg: #0a0f15; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Segoe UI", system-ui, -apple-system, sans-serif; }
+    a { color: var(--accent); }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+    header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; }
+    .hero { padding: 40px 0 28px; max-width: 720px; }
+    h1 { font-size: clamp(32px, 6vw, 48px); line-height: 1.12; letter-spacing: -.02em; margin: 0 0 16px; }
+    .lede { font-size: 19px; color: var(--muted); margin: 0 0 24px; }
+    .btn { display: inline-block; padding: 10px 18px; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; text-decoration: none; }
+    .btn.alt { background: none; color: var(--accent); }
+    figure { margin: 0; }
+    .shot { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 10px; }
+    figcaption { color: var(--muted); font-size: 14px; margin-top: 8px; }
+    section { padding: 36px 0; }
+    h2 { font-size: 26px; letter-spacing: -.01em; margin: 0 0 8px; }
+    .sub { color: var(--muted); margin: 0 0 22px; max-width: 680px; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+    .card h3 { font-size: 16px; margin: 0 0 6px; }
+    .card p { margin: 0; color: var(--muted); font-size: 15px; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; }
+    pre { background: var(--code-bg); color: var(--code-text); padding: 16px 18px; border-radius: 10px; overflow-x: auto; font: 14px/1.55 ui-monospace, "Cascadia Code", Consolas, monospace; margin: 0 0 14px; }
+    code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .92em; }
+    p code, li code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+    ul { padding-left: 20px; margin: 0; }
+    li { margin-bottom: 6px; }
+    .status { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 16px 20px; }
+    footer { border-top: 1px solid var(--border); padding: 22px 0 40px; color: var(--muted); font-size: 14px; margin-top: 20px; }
+    @media (max-width: 800px) { .grid, .split { grid-template-columns: 1fr; } .wrap { padding: 0 16px; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div class="brand"><img src="assets/favicon.svg" width="26" height="26" alt=""> Posh-ACME Dashboard</div>
+      <a href="https://github.com/zoutbot-cpu/posh-acme-dashboard">GitHub</a>
+    </header>
+
+    <div class="hero">
+      <h1>See every certificate. Catch the server that didn't get the new one.</h1>
+      <p class="lede">A self-hosted web dashboard for <a href="https://poshac.me">Posh-ACME</a>. It shows the status of every certificate, renews them from the browser, and checks which certificate your servers are actually serving.</p>
+      <a class="btn" href="#install">Install</a>
+      <a class="btn alt" href="https://github.com/zoutbot-cpu/posh-acme-dashboard">View the source</a>
+    </div>
+
+    <figure>
+      <img class="shot" src="assets/certificates.png" width="800" height="500" alt="Certificates table showing expired, expiring, renewal-due and valid certificates with days remaining">
+      <figcaption>Sample data.</figcaption>
+    </figure>
+
+    <section>
+      <h2>What it does</h2>
+      <p class="sub">PowerShell and static files only: no extra modules, no Node, nothing loaded from a CDN.</p>
+      <div class="grid">
+        <div class="card"><h3>Status at a glance</h3><p>Every order across all ACME servers and accounts, with days left, renew-after dates and validation plugin.</p></div>
+        <div class="card"><h3>Actions with a live log</h3><p>Renew, revoke, delete and request certificates. They run in the background, and the log follows along.</p></div>
+        <div class="card"><h3>GoDaddy template</h3><p>Preset for DNS validation, reuse of saved credentials, and a read-only credentials test before you request.</p></div>
+        <div class="card"><h3>Email alerts</h3><p>Expiry warnings and a daily or weekly digest through Microsoft 365, using OAuth with no SMTP password.</p></div>
+        <div class="card"><h3>Shared and access-controlled</h3><p>One instance for the team, with Windows sign-in and full or view-only access by AD user or group.</p></div>
+        <div class="card"><h3>Auto-renewal check</h3><p>Finds your <code>Submit-Renewal</code> tasks, shows their last result, and warns when there are none.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="split">
+        <div>
+          <h2>Know where each certificate is used</h2>
+          <p class="sub">A wildcard certificate can end up on many servers, and renewing it doesn't update them. List where it's installed, and the dashboard connects to each one to read the certificate it presents.</p>
+          <ul>
+            <li>Flags servers still on the <strong>old certificate</strong> as soon as it renews</li>
+            <li>Works over TLS and SMTP with STARTTLS</li>
+            <li>Read-only, with no credentials needed on the servers</li>
+          </ul>
+        </div>
+        <figure><img class="shot" src="assets/deployments.png" width="800" height="500" loading="lazy" alt="Deployments table showing servers that are up to date, on an old certificate, or unreachable"></figure>
+      </div>
+    </section>
+
+    <section>
+      <h2>Safe to try</h2>
+      <p class="sub">Read-only mode locks the whole dashboard down, in the server and not only in the page.</p>
+      <div class="grid">
+        <div class="card"><h3>No changes</h3><p>Renewals, revocations, settings edits, emails and server checks are all switched off.</p></div>
+        <div class="card"><h3>Config untouched</h3><p>Posh-ACME only sees an empty temporary folder. Your real config is read with plain file reads.</p></div>
+        <div class="card"><h3>One exception</h3><p>A GoDaddy credentials test that sends only GET requests. Nothing you type is saved.</p></div>
+      </div>
+    </section>
+
+    <section id="install">
+      <h2>Install</h2>
+      <p class="sub">Needs Windows, PowerShell 5.1 or 7, and Posh-ACME 4.x.</p>
+      <p>Try it on your own machine first, without installing anything:</p>
+      <pre><code>git clone https://github.com/zoutbot-cpu/posh-acme-dashboard
+cd posh-acme-dashboard
+.\Start-PoshAcmeDashboard.ps1 -ReadOnly -OpenBrowser</code></pre>
+      <p>To share it with your team, run the installer from an elevated prompt. Add <code>-WhatIf</code> to preview every step.</p>
+      <pre><code>.\Install-PoshAcmeDashboard.ps1 -ServiceAccount 'CONTOSO\svc-acme' -ListenAddress + `
+    -AllowedPrincipals 'CONTOSO\PKI Admins' -CertThumbprint &lt;thumbprint&gt;</code></pre>
+      <p>Run it as the Windows account that owns your Posh-ACME config. See the <a href="https://github.com/zoutbot-cpu/posh-acme-dashboard#readme">README</a> for the details.</p>
+    </section>
+
+    <section>
+      <div class="status">
+        <strong>Project status: early.</strong> Tested against sample data, Let's Encrypt staging and local test servers. Issuing through GoDaddy, sending through Microsoft 365, and the installer's admin-only steps have not yet been run end to end, so start with <code>-ReadOnly</code> and staging.
+      </div>
+    </section>
+
+    <footer>
+      MIT licence. An independent project, not affiliated with Posh-ACME, Let's Encrypt, GoDaddy or Microsoft.
+    </footer>
+  </div>
+</body>
+</html>
