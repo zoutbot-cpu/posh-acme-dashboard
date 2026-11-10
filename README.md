@@ -180,6 +180,22 @@ Step-by-step help for creating the service account (gMSA or domain user) and get
 
 Run the script again to upgrade; data and an edited `templates.json` are kept. Stopping or upgrading ends the task immediately, so don't do it while a renewal is running.
 
+### Updating
+
+To update an installed dashboard to the latest version on GitHub without copying files over by hand, paste this into an **elevated** PowerShell on the server. It downloads `main`, replaces the program files and restarts the task. Settings, the deployment list, logs and your `templates.json` are kept, and the install settings (account, port, HTTPS, principals) stay as they are.
+
+```powershell
+$dst = "$env:ProgramFiles\PoshAcmeDashboard"; $zip = "$env:TEMP\posh-acme-dashboard.zip"; $tmp = "$env:TEMP\posh-acme-dashboard"
+Invoke-WebRequest 'https://github.com/zoutbot-cpu/posh-acme-dashboard/archive/refs/heads/main.zip' -OutFile $zip -UseBasicParsing
+Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue; Expand-Archive $zip $tmp; $src = "$tmp\posh-acme-dashboard-main"
+Stop-ScheduledTask 'Posh-ACME Dashboard'
+Copy-Item "$src\Start-PoshAcmeDashboard.ps1", "$src\Install-PoshAcmeDashboard.ps1", "$src\README.md" $dst -Force
+'lib', 'www' | ForEach-Object { Remove-Item "$dst\$_" -Recurse -Force -ErrorAction SilentlyContinue; Copy-Item "$src\$_" $dst -Recurse -Force }
+Start-ScheduledTask 'Posh-ACME Dashboard'; Remove-Item $zip, $tmp -Recurse -Force
+```
+
+If you installed with a custom `-InstallPath`, change `$dst` on the first line. Like an upgrade, this ends the running task, so don't do it while a renewal is running. Running the installer again is only needed when you want to change install settings.
+
 ```powershell
 .\Install-PoshAcmeDashboard.ps1 -Uninstall              # keeps settings and the deployment list
 .\Install-PoshAcmeDashboard.ps1 -Uninstall -RemoveData  # deletes those too

@@ -1201,7 +1201,16 @@ try {
         $pending = $listener.GetContextAsync()
         # Poll so Ctrl+C is handled between waits.
         while (-not $pending.AsyncWaitHandle.WaitOne(250)) { Invoke-ScheduledWork }
-        $context = $pending.GetAwaiter().GetResult()
+        # A client that drops during the TLS or Windows sign-in handshake makes this throw.
+        # That only concerns that one connection, so keep serving everyone else.
+        try {
+            $context = $pending.GetAwaiter().GetResult()
+        } catch {
+            if (-not $listener.IsListening) { break }
+            $ex = $_.Exception; while ($ex.InnerException) { $ex = $ex.InnerException }
+            Write-Warning ("[{0:HH:mm:ss}] Dropped a connection: {1}" -f (Get-Date), $ex.Message)
+            continue
+        }
         try {
             Invoke-Route $context
         } catch [ArgumentException] {
@@ -1209,13 +1218,16 @@ try {
         } catch [Management.Automation.ItemNotFoundException] {
             try { Send-Error $context 404 $_.Exception.Message } catch { }
         } catch {
-            Write-Warning "$($context.Request.HttpMethod) $($context.Request.Url.AbsolutePath): $($_.Exception.Message)"
+            Write-Warning ("[{0:HH:mm:ss}] {1} {2} from {3}: {4}" -f (Get-Date), $context.Request.HttpMethod, $context.Request.Url.AbsolutePath, $context.Request.RemoteEndPoint, $_.Exception.Message)
             try { Send-Error $context 500 $_.Exception.Message } catch { }
         } finally {
             try { $context.Response.Close() } catch { }
         }
         Invoke-ScheduledWork
     }
+} catch {
+    Write-Host ("[{0:HH:mm:ss}] Dashboard stopped on an error: {1}`n{2}" -f (Get-Date), $_.Exception.Message, $_.ScriptStackTrace) -ForegroundColor Red
+    throw
 } finally {
     $listener.Stop()
     $listener.Close()
