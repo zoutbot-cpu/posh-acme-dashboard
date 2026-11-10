@@ -204,6 +204,25 @@ function Wait-ForPort {
     return $false
 }
 
+function Get-TaskFailureHint {
+    # Turns the scheduled task's last result into the likely cause, so the message points at the real problem.
+    param([string]$Hex, [string]$Account, [bool]$HasLog)
+    $seeLog = if ($HasLog) { 'The log lines below show why.' } else { "No log was written, so it failed before the dashboard's own logging started." }
+    switch ($Hex) {
+        '41301' { "The task is running, so the logon worked, but the dashboard did not open the port within 45 seconds. $seeLog If it is only slow, wait a minute and browse to it." }
+        '41303' { "The task never started, which usually means Windows refused the logon. Check the Security log for event 4625: Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4625} -MaxEvents 5 | Format-List TimeCreated, Message" }
+        '80070569' { "$Account is not allowed to 'Log on as a batch job'. On a domain computer a GPO that sets this right replaces the local list, and 'Deny log on as a batch job' overrides a grant. Grant it in that GPO, run gpupdate /force, then run this installer again." }
+        '8007052E' { "Wrong password for $Account. Run the installer again and retype it." }
+        '80070532' { "The password of $Account has expired. Reset it, then run the installer again." }
+        '80070533' { "$Account is disabled. Enable it, then run the installer again." }
+        '80070534' { "$Account is locked out. Unlock it, then run the installer again." }
+        '8007052F' { "$Account has a logon restriction, such as allowed logon hours or 'Log On To' computers. Check the account in Active Directory." }
+        '800710E0' { "Windows refused to run the task. On a domain this is often the policy 'Network access: Do not allow storage of passwords and credentials', which blocks tasks with a saved password; a gMSA avoids it. It can also be a missing 'Log on as a batch job' right." }
+        '0' { "The dashboard exited without an error but is not running. $seeLog" }
+        default { "The dashboard stopped with an error. $seeLog" }
+    }
+}
+
 function Read-InstallRecord {
     param([string]$Folder)
     $file = Join-Path $Folder 'install.json'
@@ -367,10 +386,12 @@ function Invoke-Install {
     Start-ScheduledTask -TaskName $TaskName
     if (-not (Wait-ForPort $Port)) {
         $info = Get-ScheduledTaskInfo -TaskName $TaskName
-        Write-Host "The dashboard did not start listening on port $Port. Task result: 0x$('{0:X}' -f $info.LastTaskResult)" -ForegroundColor Red
-        Write-Host '  An account denied "Log on as a batch job" by policy also fails here.' -ForegroundColor Red
+        $hex = '{0:X}' -f $info.LastTaskResult
         $log = Join-Path $DataPath 'logs\dashboard.log'
-        if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Tail 15 | ForEach-Object { "  $_" } }
+        $hasLog = Test-Path -LiteralPath $log
+        Write-Host "The dashboard did not start listening on port $Port. Task result: 0x$hex" -ForegroundColor Red
+        Write-Host "  $(Get-TaskFailureHint $hex $ServiceAccount $hasLog)" -ForegroundColor Red
+        if ($hasLog) { Get-Content -LiteralPath $log -Tail 15 | ForEach-Object { "  $_" } }
         exit 1
     }
 
