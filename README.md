@@ -173,6 +173,8 @@ It does the following:
 
 When shared, it also adds the URL reservation, the HTTPS binding and a firewall rule for domain and private networks. Account and group names are checked before anything changes.
 
+Step-by-step help for creating the service account (gMSA or domain user) and getting the HTTPS certificate for `-CertThumbprint` (internal CA, Posh-ACME or self-signed) is on the [website's Install section](https://zoutbot-cpu.github.io/posh-acme-dashboard/#service-account). `-CertThumbprint` is optional; without it the dashboard uses plain HTTP.
+
 **Choose the run account carefully.** Posh-ACME stores its config and encrypted credentials per Windows account, so install under the account that already owns your certificates, or they won't appear. A group Managed Service Account (name ending in `$`) needs no password. The account must be allowed to "Log on as a batch job".
 
 Run the script again to upgrade; data and an edited `templates.json` are kept. Stopping or upgrading ends the task immediately, so don't do it while a renewal is running.

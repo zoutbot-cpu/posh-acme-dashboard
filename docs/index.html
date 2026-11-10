@@ -40,7 +40,8 @@
     pre { background: var(--code-bg); color: var(--code-text); padding: 16px 18px; border-radius: 10px; overflow-x: auto; font: 14px/1.55 ui-monospace, "Cascadia Code", Consolas, monospace; margin: 0 0 14px; }
     code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .92em; }
     p code, li code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
-    ul { padding-left: 20px; margin: 0; }
+    h3 { font-size: 19px; margin: 30px 0 8px; }
+    ul { padding-left: 20px; margin: 0 0 14px; }
     li { margin-bottom: 6px; }
     .status { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 16px 20px; }
     footer { border-top: 1px solid var(--border); padding: 22px 0 40px; color: var(--muted); font-size: 14px; margin-top: 20px; }
@@ -115,6 +116,77 @@ cd posh-acme-dashboard
       <pre><code>.\Install-PoshAcmeDashboard.ps1 -ServiceAccount 'CONTOSO\svc-acme' -ListenAddress + `
     -AllowedPrincipals 'CONTOSO\PKI Admins' -CertThumbprint &lt;thumbprint&gt;</code></pre>
       <p>Run it as the Windows account that owns your Posh-ACME config. See the <a href="https://github.com/zoutbot-cpu/posh-acme-dashboard#readme">README</a> for the details.</p>
+
+      <h3 id="service-account">The service account</h3>
+      <p><code>-ServiceAccount</code> is the Windows account the dashboard runs as. Posh-ACME keeps its config and saved credentials per account, so this account must be the one that owns (or can read) your Posh-ACME config. For a first test, leave it out: it then runs as you, and the installer asks for your password once.</p>
+      <p>For a real install, use a dedicated account. It needs:</p>
+      <ul>
+        <li>the <strong>Log on as a batch job</strong> right on the dashboard computer (Group Policy or <em>secpol.msc → Local Policies → User Rights Assignment</em>). Without it the task fails to start;</li>
+        <li>no administrator rights, unless you add <code>-RunElevated</code> because orders install certificates into the Windows store;</li>
+        <li>access to the Posh-ACME config (see below).</li>
+      </ul>
+
+      <p><strong>Recommended: a group Managed Service Account (gMSA).</strong> Windows manages its password, so nothing expires and the installer asks for no password. Run these once, as a domain admin, with the Active Directory PowerShell module (RSAT). Replace <code>ACMEHOST</code> with the dashboard computer's name.</p>
+      <pre><code># 1. Only if the domain has no KDS root key yet (Get-KdsRootKey shows nothing).
+#    It can take up to 10 hours before gMSAs can use it.
+Add-KdsRootKey -EffectiveImmediately
+
+# 2. Create the gMSA and let the dashboard computer use it
+New-ADServiceAccount -Name svc-acme -DNSHostName svc-acme.contoso.com `
+    -PrincipalsAllowedToRetrieveManagedPassword 'ACMEHOST$'</code></pre>
+      <p>Then on the dashboard computer, elevated:</p>
+      <pre><code># RSAT AD module: Windows Server
+Install-WindowsFeature RSAT-AD-PowerShell
+# ...or Windows 10/11
+Add-WindowsCapability -Online -Name Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0
+
+Install-ADServiceAccount svc-acme
+Test-ADServiceAccount svc-acme    # must print True</code></pre>
+      <p>If <code>Test-ADServiceAccount</code> prints False right after step 2, restart the computer so it picks up the new permission, and try again. Install with the name ending in <code>$</code>: <code>-ServiceAccount 'CONTOSO\svc-acme$'</code>.</p>
+
+      <p><strong>Alternative: a normal domain user.</strong> Simpler to create, but you manage its password, and the installer asks for it. When the password changes, rerun the installer.</p>
+      <pre><code>New-ADUser -Name svc-acme -AccountPassword (Read-Host -AsSecureString 'Password') `
+    -Enabled $true -PasswordNeverExpires $true -CannotChangePassword $true</code></pre>
+
+      <p><strong>Giving it your Posh-ACME config.</strong> A new account starts with no certificates. Either:</p>
+      <ul>
+        <li>create the certificates as that account (for a normal user: <code>runas /user:CONTOSO\svc-acme pwsh</code>, then use Posh-ACME as usual), or</li>
+        <li>keep the config in a shared folder and pass it with <code>-PoshAcmeHome C:\ProgramData\Posh-ACME</code>; the installer gives the account access. Saved plugin credentials are encrypted for the account that saved them, so first run <code>Set-PAAccount -UseAltPluginEncryption</code> for each ACME account, as the old owner, so another account can read them. This is the way to go with a gMSA, which can't log on interactively.</li>
+      </ul>
+
+      <h3 id="https-certificate">The HTTPS certificate</h3>
+      <p><code>-CertThumbprint</code> is the certificate the dashboard serves HTTPS with. It's optional: leave it out to test on this machine only (no <code>-ListenAddress</code>), or to test over plain HTTP on the network, which the installer warns about. Use HTTPS before anyone types real API keys or secrets into the page.</p>
+      <p>The certificate must:</p>
+      <ul>
+        <li>be in the computer's store, <strong>Local Computer → Personal</strong> (<code>Cert:\LocalMachine\My</code>), not your user store;</li>
+        <li>have its private key;</li>
+        <li>be valid for <strong>Server Authentication</strong>;</li>
+        <li>contain the name people will type in the browser, usually the computer's full name (<code>[System.Net.Dns]::GetHostEntry('').HostName</code> shows it), or browsers will warn.</li>
+      </ul>
+      <p>Pick one way to get it:</p>
+
+      <p><strong>Domain computer: ask your internal CA (AD CS).</strong> Best choice on a domain, because every domain computer already trusts it. From the elevated prompt:</p>
+      <pre><code>$fqdn = [System.Net.Dns]::GetHostEntry('').HostName
+$req  = Get-Certificate -Template WebServer -DnsName $fqdn -CertStoreLocation Cert:\LocalMachine\My
+$req.Certificate.Thumbprint</code></pre>
+      <p>Template names differ per company. If you get "access denied" or "template not found", ask your PKI admin which template gives computers a web server certificate and whether this computer may enroll. You can also use <em>certlm.msc → Personal → Certificates → All Tasks → Request New Certificate</em>.</p>
+
+      <p><strong>Public name: issue one with Posh-ACME.</strong> Only works when the dashboard's name is a real public domain you can validate, for example <code>acme.contoso.com</code>. <code>-Install</code> needs the elevated prompt and puts it in the right store:</p>
+      <pre><code>New-PACertificate acme.contoso.com -Plugin GoDaddy -PluginArgs $pArgs -Install
+(Get-PACertificate acme.contoso.com).Thumbprint</code></pre>
+      <p>Remember to install the renewed certificate again later: the HTTPS binding keeps the old thumbprint until you rerun the installer.</p>
+
+      <p><strong>Quick test only: self-signed.</strong> Works straight away, but other computers show a certificate warning:</p>
+      <pre><code>$fqdn = [System.Net.Dns]::GetHostEntry('').HostName
+$cert = New-SelfSignedCertificate -DnsName $fqdn, $env:COMPUTERNAME -CertStoreLocation Cert:\LocalMachine\My -NotAfter (Get-Date).AddYears(1)
+$cert.Thumbprint</code></pre>
+
+      <p><strong>Already have one?</strong> List the certificates on the computer and copy the thumbprint:</p>
+      <pre><code>Get-ChildItem Cert:\LocalMachine\My | Where-Object HasPrivateKey | Format-List Subject, DnsNameList, NotAfter, Thumbprint</code></pre>
+      <p>Pass the 40-character thumbprint itself, without the angle brackets from the example (PowerShell reads <code>&lt;</code> as an operator):</p>
+      <pre><code>.\Install-PoshAcmeDashboard.ps1 -ServiceAccount 'CONTOSO\svc-acme' -ListenAddress + `
+    -AllowedPrincipals 'CONTOSO\PKI Admins' -CertThumbprint 3F2A9C...E41B</code></pre>
+      <p>Then browse to <code>https://&lt;computer name&gt;:8580/</code>.</p>
     </section>
 
     <section>

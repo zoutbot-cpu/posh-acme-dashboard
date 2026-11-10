@@ -255,8 +255,10 @@ function Invoke-Install {
     }
     if ($useHttps) {
         $CertThumbprint = ($CertThumbprint -replace '[^0-9a-fA-F]', '').ToUpperInvariant()
+        if ($CertThumbprint.Length -ne 40) { throw "-CertThumbprint must be the certificate's 40-character thumbprint. List them with: Get-ChildItem Cert:\LocalMachine\My | Format-List Subject, NotAfter, Thumbprint" }
         $cert = Get-Item -LiteralPath "Cert:\LocalMachine\My\$CertThumbprint" -ErrorAction SilentlyContinue
-        if (-not $cert) { throw "Certificate $CertThumbprint is not in the LocalMachine\My store." }
+        if (-not $cert) { throw "Certificate $CertThumbprint is not in the computer's Personal store (Cert:\LocalMachine\My). A certificate in your own user store doesn't count. See the Install section of the website for how to get one, or leave -CertThumbprint out to use HTTP." }
+        if (-not $cert.HasPrivateKey) { throw "Certificate $CertThumbprint has no private key on this computer, so it can't serve HTTPS. Import it from a PFX that includes the key." }
     }
     if (-not $localOnly -and -not $useHttps) {
         Write-Warning 'Sharing without HTTPS: GoDaddy and email secrets typed into the page cross the network unencrypted. Use -CertThumbprint.'
