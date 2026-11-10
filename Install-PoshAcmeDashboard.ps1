@@ -204,6 +204,14 @@ function Wait-ForPort {
     return $false
 }
 
+function Test-PerUserPath {
+    # True for the Microsoft Store (WindowsApps) and anything inside a user profile.
+    param([string]$Path)
+    $full = [IO.Path]::GetFullPath($Path).TrimEnd('\') + '\'
+    $profiles = (Split-Path -Parent $env:USERPROFILE).TrimEnd('\') + '\'
+    $full -like '*\WindowsApps\*' -or $full.StartsWith($profiles, [StringComparison]::OrdinalIgnoreCase)
+}
+
 function Get-TaskFailureHint {
     # Turns the scheduled task's last result into the likely cause, so the message points at the real problem.
     param([string]$Hex, [string]$Account, [bool]$HasLog)
@@ -217,6 +225,7 @@ function Get-TaskFailureHint {
         '80070533' { "$Account is disabled. Enable it, then run the installer again." }
         '80070534' { "$Account is locked out. Unlock it, then run the installer again." }
         '8007052F' { "$Account has a logon restriction, such as allowed logon hours or 'Log On To' computers. Check the account in Active Directory." }
+        '80070005' { "Access denied: Windows logged $Account on but it may not start $Engine or use $InstallPath. Make sure that account (or Users) can read and run both, for example with icacls. A PowerShell installed only for one user or from the Microsoft Store causes this; install it for all users." }
         '800710E0' { "Windows refused to run the task. On a domain this is often the policy 'Network access: Do not allow storage of passwords and credentials', which blocks tasks with a saved password; a gMSA avoids it. It can also be a missing 'Log on as a batch job' right." }
         '0' { "The dashboard exited without an error but is not running. $seeLog" }
         default { "The dashboard stopped with an error. $seeLog" }
@@ -268,6 +277,14 @@ function Invoke-Install {
         throw "Sharing on the network needs -AllowedPrincipals with the users or groups allowed in. Without it the dashboard refuses to start."
     }
     $accountSid = Resolve-AccountSid $ServiceAccount
+    # The task starts this same PowerShell. A Store or per-user install can't be started by another
+    # account, and the task then fails with 0x80070005 (access denied).
+    $myAccount = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    if ($accountSid -ne $myAccount -and (Test-PerUserPath $PSHOME)) {
+        throw ("This PowerShell is installed only for you ($PSHOME), so $ServiceAccount can't start it. " +
+            "Install PowerShell 7 for all users (winget install --id Microsoft.PowerShell -e --scope machine) and run the installer from it, " +
+            "or run the installer from Windows PowerShell 5.1 (powershell.exe).")
+    }
     foreach ($p in @($AllowedPrincipals) + @($ReadOnlyPrincipals) | Where-Object { $_ }) { $null = Resolve-AccountSid $p }
     if ($PoshAcmeHome -and -not (Test-Path -LiteralPath $PoshAcmeHome -PathType Container) -and -not $WhatIfPreference) {
         throw "Posh-ACME config folder '$PoshAcmeHome' does not exist."
