@@ -140,6 +140,7 @@ The task exits with code 1 when sending fails, so failures show up in Task Sched
 
 - Windows with PowerShell 7+ (recommended) or Windows PowerShell 5.1
 - Posh-ACME 4.x: `Install-Module Posh-ACME -Scope CurrentUser`
+- Git, to download the dashboard: `winget install --id Git.Git -e --source winget`, then open a new PowerShell window. Without winget or Git, download the [ZIP](https://github.com/zoutbot-cpu/posh-acme-dashboard/archive/refs/heads/main.zip), run `Unblock-File` on it, and extract it.
 
 ## Running
 

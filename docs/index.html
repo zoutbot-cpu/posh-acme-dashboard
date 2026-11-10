@@ -107,7 +107,10 @@
 
     <section id="install">
       <h2>Install</h2>
-      <p class="sub">Needs Windows, PowerShell 5.1 or 7, and Posh-ACME 4.x.</p>
+      <p class="sub">Needs Windows, PowerShell 5.1 or 7, Posh-ACME 4.x, and Git to download it.</p>
+      <p>No Git yet? Install it, then open a new PowerShell window so the <code>git</code> command is found:</p>
+      <pre><code>winget install --id Git.Git -e --source winget</code></pre>
+      <p>Without winget or Git, download the <a href="https://github.com/zoutbot-cpu/posh-acme-dashboard/archive/refs/heads/main.zip">ZIP</a> instead, unblock it with <code>Unblock-File</code>, and extract it.</p>
       <p>Try it on your own machine first, without installing anything:</p>
       <pre><code>git clone https://github.com/zoutbot-cpu/posh-acme-dashboard
 cd posh-acme-dashboard
